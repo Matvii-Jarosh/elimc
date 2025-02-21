@@ -16,6 +16,12 @@ x^2
 
 2+3*4
 
+## Math functions
+
+sin cos tg ctg
+arcsin arccos arctg
+sqrt abs
+
 ## Authors
 
 Matvii Jarosh matviijarosh@gmail.com

@@ -48,7 +48,8 @@
 (defun elimc-token-funp (token)
   "Return t if TOKEN is a math function."
   (if (stringp token)
-      (member token '("sin" "cos" "tg" "ctg" "sqrt" "abs"))
+      (member token '("sin" "cos" "tg" "ctg" "sqrt" "abs"
+		      "arcsin" "arccos" "arctg"))
     (error "Token is not a string")))
 
 (defun elimc-op-preced (token)
@@ -128,6 +129,9 @@ Returns the result of the operation, or NaN if invalid."
                                 ((string-equal token "cos") (cos a))
                                 ((string-equal token "tg") (tan a))
                                 ((string-equal token "ctg") (/ 1.0 (tan a)))
+				((string-equal token "arcsin") (asin a))
+				((string-equal token "arccos") (acos a))
+				((string-equal token "arctg") (atan a))
                                 ((string-equal token "sqrt")
                                  (if (< a 0) nan-value (sqrt a)))
                                 ((string-equal token "abs") (abs a)))
