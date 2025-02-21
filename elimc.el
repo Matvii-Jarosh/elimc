@@ -4,7 +4,7 @@
 
 ;; Author: Matvii Jarosh <matviijarosh@gmail.com>
 ;; Created: 2025-02-15
-;; Version: 1.0
+;; Version: 1.1
 
 ;; elimc is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -263,33 +263,46 @@ Then update the RESULT-WIDGET-LOCAL and ERROR-WIDGET-LOCAL."
 
 ;; ui graphic
 (defun elimc-create-image (width height)
-  "Create an image as a list, filling it with white (255).
+  "Create an XPM image as a list, filling it with white color.
 
 WIDTH and HEIGHT this is the size of the image."
-  (let ((default-color 255))
+  (let ((default-color " "))
     (make-list height (make-list width default-color))))
 
 (defun elimc-fill-image (image color)
-  "Fills all pixels of the image IMAGE with the specified color COLOR."
+  "Fills all pixels of the image IMAGE with the specified COLOR."
   (mapcar (lambda (row) (make-list (length row) color)) image))
 
 (defun elimc-setpixel (image x y color)
-  "Set the pixel in the IMAGE at position (X, Y) to the COLOR."
-  (setf (nth x (nth y image)) color))
+  "Set the pixel in IMAGE at position (X, Y) to the specified COLOR."
+  (setf (nth y image)
+        (append (cl-subseq (nth y image) 0 x)
+                (list color)
+                (cl-subseq (nth y image) (1+ x)))))
 
-(defun elimc-image-to-pbm (image)
-  "Convert an IMAGE to a PBM string representation."
+(defun elimc-image-to-xpm (image)
+  "Convert IMAGE to XPM string representation."
   (let* ((width (length (car image)))
          (height (length image))
-         (pbm-data (list (format "%d %d" width height)
-			 "P1")))
+         (color-map (make-hash-table :test 'equal))
+         (colors '())
+         (pixels '())
+         (char-list
+	  "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"))
     (dolist (row image)
-      (push (mapconcat
-	     (lambda (pixel)
-	       (if (= pixel 0) "1" "0"))
-	     row " ")
-	    pbm-data))
-    (string-join (reverse pbm-data) "\n")))
+      (dolist (pixel row)
+        (unless (gethash pixel color-map)
+          (let ((char (string (aref char-list (length colors)))))
+            (push (format "%s c %s" char pixel) colors)
+            (puthash pixel char color-map)))))
+    (dolist (row image)
+      (push (mapconcat (lambda (pixel) (gethash pixel color-map)) row "") pixels))
+    (concat "/* XPM */\nstatic char *image_xpm[] = {\n"
+            (format "\"%d %d %d 1\",\n" width height (length colors))
+            (mapconcat (lambda (c) (concat "\"" c "\",")) (reverse colors) "\n")
+            "\n"
+            (mapconcat (lambda (p) (concat "\"" p "\",")) (reverse pixels) "\n")
+            "};")))
 
 (defun elimc--push-image (image)
   "Create a new buffer and insert the IMAGE into it."
@@ -306,31 +319,40 @@ Then update the ERROR-WIDGET-LOCAL."
            (rpn (if (string= notation "Infix")
                     (elimc-shunting-yard tokens)
                   tokens))
-           (image (elimc-fill-image (elimc-create-image 400 400) 0)))
+           (image (elimc-fill-image (elimc-create-image 400 400) "#ffffff")))
 
         ;; grid
         (dotimes (x 400)
           (dotimes (y 400)
             (when (or (= (mod x 50) 0)
                       (= (mod y 50) 0))
-              (elimc-setpixel image x y 1))))
+              (elimc-setpixel image x y "#cccccc"))))
 
         ;; plot
-        (dotimes (x 400)
-          (let* ((x-val (- (/ (* x 8.0) 400) 4))
-                 (y-val (elimc-rpn rpn x-val)))
-            (if (or (isnan y-val) (> (abs y-val) 1.0e6))
-                (setq y-val 0.0e+NaN)
-              (let ((y (round (- 200 (* 50 y-val)))))
-                (when (and (>= y 0) (< y 400))
-                  (elimc-setpixel image x y 1))))))
+	(dotimes (x 400)
+	  (let* ((x-val (- (/ (* x 8.0) 400) 4))
+		 (y-val (elimc-rpn rpn x-val)))
+	    (if (or (isnan y-val) (> (abs y-val) 1.0e6))
+		(setq y-val 0.0e+NaN)
+	      (let ((y (round (- 200 (* 50 y-val)))))
+		(when (and (>= y 0) (< y 400))
+		  (elimc-setpixel image x y "#ff0000")
+		  (when (> x 0)
+		    (elimc-setpixel image (1- x) y "#ff0000"))
+		  (when (< x 399)
+		    (elimc-setpixel image (1+ x) y "#ff0000"))
+		  (when (> y 0)
+		    (elimc-setpixel image x (1- y) "#ff0000"))
+		  (when (< y 399)
+		    (elimc-setpixel image x (1+ y) "#ff0000")))))))
+
 
         ;; display img
-        (let ((pbm (elimc-image-to-pbm image)))
+        (let ((pbm (elimc-image-to-xpm image)))
           (with-current-buffer "*Function Plotter*"
             (let ((inhibit-read-only t))
               (goto-char (point-max))
-              (elimc--push-image (create-image pbm 'pbm ""))))))
+              (elimc--push-image (create-image pbm 'xpm ""))))))
     (error
      (widget-value-set error-widget-local (error-message-string err)))))
 
