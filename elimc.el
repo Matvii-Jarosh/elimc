@@ -4,7 +4,7 @@
 
 ;; Author: Matvii Jarosh <matviijarosh@gmail.com>
 ;; Created: 2025-02-15
-;; Version: 1.2
+;; Version: 1.3
 
 ;; elimc is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -89,69 +89,104 @@
 ;; shunting-yard
 (defun elimc-shunting-yard
     (input)
-  "Convert a mathematical expression to Reverse Polish Notation from INPUT."
+  "Convert a mathematical expression to Reverse Polish Notation.\nTakes INPUT as a list of tokens and return a list in RPN."
   (if
       (listp input)
-      (let
-	  ((tokens
-	    (copy-tree input))
-	   (stack nil)
-	   (output nil))
-	(while tokens
-	  (let
-	      ((token
-		(pop tokens)))
-	    (cond
-	     ((string-match "^[0-9.]+$" token)
-	      (push token output))
-	     ((elimc-token-funp token)
-	      (push token stack))
-	     ((elimc-token-operatorp token)
-	      (while
-		  (and stack
-		       (not
-			(string-equal
-			 (car stack)
-			 "("))
-		       (<=
-			(elimc-op-preced token)
-			(elimc-op-preced
-			 (car stack))))
-		(push
-		 (pop stack)
-		 output))
-	      (push token stack))
-	     ((member token
-		      '("x" "pi" "e"))
-	      (push token output))
-	     ((string-equal token "(")
-	      (push token stack))
-	     ((string-equal token ")")
-	      (while
-		  (and stack
-		       (not
-			(string-equal
-			 (car stack)
-			 "(")))
-		(push
-		 (pop stack)
-		 output))
-	      (pop stack)
-	      (when
-		  (and stack
-		       (elimc-token-funp
-			(car stack)))
-		(push
-		 (pop stack)
-		 output)))
-	     (t
-	      (error "Invalid token")))))
-	(while stack
-	  (push
-	   (pop stack)
-	   output))
-	(nreverse output))
+      (elimc-shunting-yard-iter input nil nil)
     (error "The input argument is not a list")))
+
+(defun elimc-shunting-yard-iter
+    (tokens stack output)
+  "Recursive helper function for elimc-shunting-yard.\nUsed TOKENS, STACK and OUTPUT."
+  (if
+      (null tokens)
+      (nreverse
+       (append stack output))
+    (let
+	((token
+	  (car tokens))
+	 (rest
+	  (cdr tokens)))
+      (cond
+       ((string-match "^[0-9.]+$" token)
+	(elimc-shunting-yard-iter rest stack
+				  (cons token output)))
+       ((elimc-token-funp token)
+	(elimc-shunting-yard-iter rest
+				  (cons token stack)
+				  output))
+       ((elimc-token-operatorp token)
+	(let*
+	    ((result
+	      (elimc-handle-operator token stack output))
+	     (new-stack
+	      (car result))
+	     (new-output
+	      (cdr result)))
+	  (elimc-shunting-yard-iter rest new-stack new-output)))
+       ((member token
+		'("x" "pi" "e"))
+	(elimc-shunting-yard-iter rest stack
+				  (cons token output)))
+       ((string-equal token "(")
+	(elimc-shunting-yard-iter rest
+				  (cons token stack)
+				  output))
+       ((string-equal token ")")
+	(let*
+	    ((result
+	      (elimc-handle-right-paren stack output))
+	     (new-stack
+	      (car result))
+	     (new-output
+	      (cdr result)))
+	  (elimc-shunting-yard-iter rest new-stack new-output)))
+       (t
+	(error "Invalid token"))))))
+
+(defun elimc-handle-operator
+    (token stack output)
+  "Handles operators based on precedence and associativity.\nUsed TOKEN, STACK and OUTPUT."
+  (if
+      (or
+       (null stack)
+       (string-equal
+	(car stack)
+	"("))
+      (cons
+       (cons token stack)
+       output)
+    (if
+	(<=
+	 (elimc-op-preced token)
+	 (elimc-op-preced
+	  (car stack)))
+	(elimc-handle-operator token
+			       (cdr stack)
+			       (cons
+				(car stack)
+				output))
+      (cons
+       (cons token stack)
+       output))))
+
+(defun elimc-handle-right-paren
+    (stack output)
+  "Handles closing parenthesis by popping until an opening parenthesis is found.\nUsed STACK and OUTPUT."
+  (if
+      (or
+       (null stack)
+       (string-equal
+	(car stack)
+	"("))
+      (cons
+       (cdr stack)
+       output)
+    (elimc-handle-right-paren
+     (cdr stack)
+     (cons
+      (car stack)
+      output))))
 
 ;; rpnq
 (defun elimc-rpn-fun
@@ -239,58 +274,71 @@
 
 (defun elimc-rpn
     (input x-val)
-  "Calculates the value of an INPUT and X-VAL in RPN.\n\nReturn NaN if invalid."
+  "Calculates the value of an INPUT and X-VAL in RPN.\nReturn NaN if invalid."
   (if
       (and
        (listp input)
        (numberp x-val))
-      (let
-	  ((tokens
-	    (copy-tree input))
-	   (stack nil))
-	(while
-	    (and tokens
-		 (not
-		  (equal
-		   (car stack)
-		   elimc-nan-value)))
-	  (let
-	      ((token
-		(pop tokens)))
-	    (condition-case nil
-		(cond
-		 ((string-match "^[0-9.]+$" token)
-		  (push
-		   (float
-		    (string-to-number token))
-		   stack))
-		 ((elimc-token-funp token)
-		  (setq stack
-			(elimc-rpn-fun stack token)))
-		 ((elimc-token-operatorp token)
-		  (let
-		      ((b
-			(pop stack))
-		       (a
-			(pop stack)))
-		    (push
-		     (elimc-rpn-oper a b token)
-		     stack)))
-		 ((member token
-			  '("x" "pi" "e"))
-		  (setq stack
-			(elimc-rpn-const stack token x-val))))
-	      (error
-	       (push elimc-nan-value stack)))))
-	(if
-	    (or
-	     (null stack)
-	     (equal
-	      (car stack)
-	      elimc-nan-value))
-	    elimc-nan-value
-	  (pop stack)))
+      (elimc-rpn-iter
+       (copy-tree input)
+       nil x-val)
     (error "Invalid input or x-val")))
+
+(defun elimc-rpn-iter
+    (tokens stack x-val)
+  "Recursive helper function for elimc-rpn.Used TOKENS, STACK and X-VAL."
+  (if
+      (or
+       (null tokens)
+       (equal
+	(car stack)
+	elimc-nan-value))
+      (if
+	  (or
+	   (null stack)
+	   (equal
+	    (car stack)
+	    elimc-nan-value))
+	  elimc-nan-value
+	(car stack))
+    (let
+	((token
+	  (car tokens))
+	 (rest
+	  (cdr tokens)))
+      (condition-case nil
+	  (cond
+	   ((string-match "^[0-9.]+$" token)
+	    (elimc-rpn-iter rest
+			    (cons
+			     (float
+			      (string-to-number token))
+			     stack)
+			    x-val))
+	   ((elimc-token-funp token)
+	    (elimc-rpn-iter rest
+			    (elimc-rpn-fun stack token)
+			    x-val))
+	   ((elimc-token-operatorp token)
+	    (let*
+		((b
+		  (car stack))
+		 (a
+		  (cadr stack))
+		 (new-stack
+		  (cons
+		   (elimc-rpn-oper a b token)
+		   (cddr stack))))
+	      (elimc-rpn-iter rest new-stack x-val)))
+	   ((member token
+		    '("x" "pi" "e"))
+	    (elimc-rpn-iter rest
+			    (elimc-rpn-const stack token x-val)
+			    x-val)))
+	(error
+	 (elimc-rpn-iter rest
+			 (cons elimc-nan-value stack)
+			 x-val))))))
 
 ;; tui
 (eval-when-compile
@@ -525,49 +573,56 @@
 (defun elimc-plot-draw-function
     (image rpn)
   "Draws a graph of a function on an IMAGE from RPN."
-  (dotimes
-      (x 400)
-    (let*
-	((x-val
-	  (-
-	   (/
-	    (* x 8.0)
-	    400)
-	   4))
-	 (y-val
-	  (elimc-plot-evaluate-expression rpn x-val)))
-      (unless
-	  (isnan y-val)
-	(let
-	    ((y
-	      (round
-	       (- 200
-		  (* 50 y-val)))))
-	  (when
-	      (and
-	       (>= y 0)
-	       (< y 400))
-	    (elimc-setpixel image x y "#ff0000")
+  (elimc-plot-draw-function-iter image rpn 0))
+
+(defun elimc-plot-draw-function-iter
+    (image rpn x)
+  "Recursive helper function for elimc-plot-draw-function.\nUsed IMAGE, RPN ans X."
+  (if
+      (< x 400)
+      (let*
+	  ((x-val
+	    (-
+	     (/
+	      (* x 8.0)
+	      400)
+	     4))
+	   (y-val
+	    (elimc-plot-evaluate-expression rpn x-val)))
+	(unless
+	    (isnan y-val)
+	  (let
+	      ((y
+		(round
+		 (- 200
+		    (* 50 y-val)))))
 	    (when
-		(> x 0)
-	      (elimc-setpixel image
-			      (1- x)
-			      y "#ff0000"))
-	    (when
-		(< x 399)
-	      (elimc-setpixel image
-			      (1+ x)
-			      y "#ff0000"))
-	    (when
-		(> y 0)
-	      (elimc-setpixel image x
-			      (1- y)
-			      "#ff0000"))
-	    (when
-		(< y 399)
-	      (elimc-setpixel image x
-			      (1+ y)
-			      "#ff0000"))))))))
+		(and
+		 (>= y 0)
+		 (< y 400))
+	      (elimc-setpixel image x y "#ff0000")
+	      (when
+		  (> x 0)
+		(elimc-setpixel image
+				(1- x)
+				y "#ff0000"))
+	      (when
+		  (< x 399)
+		(elimc-setpixel image
+				(1+ x)
+				y "#ff0000"))
+	      (when
+		  (> y 0)
+		(elimc-setpixel image x
+				(1- y)
+				"#ff0000"))
+	      (when
+		  (< y 399)
+		(elimc-setpixel image x
+				(1+ y)
+				"#ff0000")))))
+	(elimc-plot-draw-function-iter image rpn
+				       (1+ x)))))
 
 (defun elimc-plot-display
     (image)
