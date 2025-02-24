@@ -4,7 +4,9 @@
 
 ;; Author: Matvii Jarosh <matviijarosh@gmail.com>
 ;; Created: 2025-02-15
-;; Version: 1.3
+;; URL: https://github.com/Matvii-Jarosh/elimc
+;; Version: 1.4
+;; Package-Requires: ((emacs "24.3") (cl-lib "0.7.1"))
 
 ;; elimc is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -37,6 +39,7 @@
 (defvar notation-widget)
 
 (require 'widget)
+(require 'cl-lib)
 
 ;; utils
 (defun elimc-token-operatorp
@@ -342,7 +345,8 @@
 
 ;; tui
 (eval-when-compile
-  (require 'wid-edit))
+  (require 'wid-edit)
+  (require 'widget))
 
 (defmacro elimc-in-widget
     (buffer-name &rest body)
@@ -685,5 +689,4 @@
 					  (widget-value elimc-notation-widget)
 					  elimc-error-widget))
 				       "Plot")))
-
 ;;; elimc.el ends here
