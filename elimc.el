@@ -6,7 +6,7 @@
 ;; Created: 2025-02-15
 ;; URL: https://github.com/Matvii-Jarosh/elimc
 ;; Version: 1.4
-;; Package-Requires: ((emacs "24.3") (cl-lib "0.7.1"))
+;; Package-Requires: ((emacs "24.3") (cl-lib "1.0"))
 
 ;; elimc is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -39,6 +39,7 @@
 (defvar notation-widget)
 
 (require 'widget)
+(require 'wid-edit)
 (require 'cl-lib)
 
 ;; utils
@@ -100,7 +101,7 @@
 
 (defun elimc-shunting-yard-iter
     (tokens stack output)
-  "Recursive helper function for elimc-shunting-yard.\nUsed TOKENS, STACK and OUTPUT."
+  "Recursive helper function for ELIMC-SHUNTING-YARD.\nUsed TOKENS, STACK and OUTPUT."
   (if
       (null tokens)
       (nreverse
@@ -289,7 +290,7 @@
 
 (defun elimc-rpn-iter
     (tokens stack x-val)
-  "Recursive helper function for elimc-rpn.Used TOKENS, STACK and X-VAL."
+  "Recursive helper function for ELIMC-RPN.\nUsed TOKENS, STACK and X-VAL."
   (if
       (or
        (null tokens)
@@ -581,7 +582,7 @@
 
 (defun elimc-plot-draw-function-iter
     (image rpn x)
-  "Recursive helper function for elimc-plot-draw-function.\nUsed IMAGE, RPN ans X."
+  "Recursive helper function for ELIMC-PLOT-DRAW-FUNCTION.\nUsed IMAGE, RPN ans X."
   (if
       (< x 400)
       (let*
@@ -689,4 +690,6 @@
 					  (widget-value elimc-notation-widget)
 					  elimc-error-widget))
 				       "Plot")))
+
+(provide 'elimc)
 ;;; elimc.el ends here
